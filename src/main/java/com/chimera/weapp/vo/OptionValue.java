@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,4 +20,6 @@ public class OptionValue {
     private String value;
     @Schema(description = "该可选项的价格调整，>=0。单位也为分。")
     private int priceAdjustment;
+    @Schema(description = "额外原料信息和用量列表")
+    private List<InventoryUsage> inventoryList;
 }
