@@ -9,8 +9,8 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.chimera</groupId>
-	<artifactId>weapp</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<artifactId>yuanqi</artifactId>
+	<version>1.0</version>
 	<name>weapp</name>
 	<description>Demo project for Chimera</description>
 	<url/>
