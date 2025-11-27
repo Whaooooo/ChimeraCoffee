@@ -9,8 +9,8 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.chimera</groupId>
-	<artifactId>weapp</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<artifactId>yuanqi</artifactId>
+	<version>recv3u1wizB7aZ</version>
 	<name>weapp</name>
 	<description>Demo project for Chimera</description>
 	<url/>
@@ -116,7 +116,7 @@
 		<dependency>
 			<groupId>com.github.wechatpay-apiv3</groupId>
 			<artifactId>wechatpay-java</artifactId>
-			<version>0.2.14</version>
+			<version>0.2.15</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
