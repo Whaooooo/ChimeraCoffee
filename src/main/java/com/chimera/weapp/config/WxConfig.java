@@ -90,7 +90,7 @@ public class WxConfig {
 
     @Bean
     public PrivacyEncryptor wechatPayPrivacyEncryptor() {
-        return new RSAPrivacyEncryptor(loadWechatPayPublicKey());
+        return new RSAPrivacyEncryptor(loadWechatPayPublicKey(), wechatPayPublicKeyId);
     }
 
     @Bean
@@ -99,18 +99,10 @@ public class WxConfig {
     }
 
     private PublicKey loadWechatPayPublicKey() {
-        try (InputStream inputStream = Files.newInputStream(Path.of(wechatPayPublicKeyPath))) {
-            return PemUtil.loadPublicKey(inputStream);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to load WeChat Pay public key", e);
-        }
+        return PemUtil.loadPublicKeyFromPath(wechatPayPublicKeyPath);
     }
 
     private PrivateKey loadMerchantPrivateKey() {
-        try (InputStream inputStream = Files.newInputStream(Path.of(privateKeyPath))) {
-            return PemUtil.loadPrivateKey(inputStream);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to load merchant private key", e);
-        }
+        return PemUtil.loadPrivateKeyFromPath(privateKeyPath);
     }
 }
