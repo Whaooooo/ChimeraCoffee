@@ -33,3 +33,21 @@ build/
 .vscode/
 src/main/resources/chimeracoffee.top.jks
 src/main/resources/jks-password.txt
+
+### Dev ###
+log/*
+.m2/*
+.local-mongo/*
+.local-static/*
+.tmp/*
+
+### Dev Scripts Runtime ###
+dev-scripts/.local-mongo/
+dev-scripts/.local-static/
+dev-scripts/*.log
+dev-scripts/*.bak
+dev-scripts/*.pid
+dev-scripts/.env.local
+
+### pem files ###
+*.pem

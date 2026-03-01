@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.chimera.weapp.vo.OptionValue;
+import com.chimera.weapp.vo.InventoryUsage;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -48,6 +49,8 @@ public class Product {
     private Boolean needStockWithRestrictBuy;
     @Schema(description = "库存数量，为0时前端提示已售罄并不可下单")
     private int stock;
+    @Schema(description = "原料信息和用量列表")
+    private List<InventoryUsage> inventoryList;
     @Schema(description = "预售买数量，补货后清零")
     private int presaleNum;
     @Schema(description = "当天是否已补货，0点设为False")
