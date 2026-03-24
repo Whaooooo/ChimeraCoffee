@@ -3,6 +3,7 @@ package com.chimera.weapp.controller;
 import com.chimera.weapp.annotation.LoginRequired;
 import com.chimera.weapp.entity.AppConfiguration;
 import com.chimera.weapp.repository.AppConfigurationRepository;
+import com.chimera.weapp.util.BusinessHoursValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -39,9 +40,25 @@ public class AppConfigurationController {
     @PutMapping
     @LoginRequired
     @Operation(description = "对单个做修改")
-    public ResponseEntity<AppConfiguration> updateConfiguration(@Valid @RequestBody AppConfiguration appConfiguration) {
+    public ResponseEntity<?> updateConfiguration(@Valid @RequestBody AppConfiguration appConfiguration) {
+        // Validate business hours format if updating business hours configurations
+        String key = appConfiguration.getKey();
+        if ("weekdays_opening_hours".equals(key) || "weekend_opening_hours".equals(key)) {
+            String errorMessage = BusinessHoursValidator.validateWithMessage(appConfiguration.getValue());
+            if (errorMessage != null) {
+                return ResponseEntity.badRequest().body(new ErrorResponse(errorMessage));
+            }
+        }
+        
         AppConfiguration save = repository.save(appConfiguration);
         return ResponseEntity.ok(save);
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ErrorResponse {
+        private String error;
     }
 
     @GetMapping("/openingTime")
@@ -62,6 +79,58 @@ public class AppConfigurationController {
                 .orElseThrow(() -> new RuntimeException("营业时间未找到"));
 
         return ResponseEntity.ok(openingTime);
+    }
+    
+    @GetMapping("/openingTime/structured")
+    @Operation(description = "获取营业时间的结构化数据，支持多段营业时间")
+    public ResponseEntity<OpeningTimeResponse> getOpeningTimeStructured() {
+        ZoneId currentZone = ZoneId.systemDefault();
+        ZonedDateTime now = ZonedDateTime.now(currentZone);
+        DayOfWeek dayOfWeek = now.getDayOfWeek();
+
+        Set<DayOfWeek> weekendDays = EnumSet.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY);
+        String openingTimeKey = weekendDays.contains(dayOfWeek) ? "weekend_opening_hours" : "weekdays_opening_hours";
+
+        String openingTime = repository.findByKey(openingTimeKey)
+                .map(AppConfiguration::getValue)
+                .orElseThrow(() -> new RuntimeException("营业时间未找到"));
+
+        // Parse multi-segment format
+        List<TimeSegment> segments = parseTimeSegments(openingTime);
+        
+        return ResponseEntity.ok(new OpeningTimeResponse(openingTime, segments));
+    }
+    
+    private List<TimeSegment> parseTimeSegments(String businessHours) {
+        List<TimeSegment> segments = new java.util.ArrayList<>();
+        if (businessHours == null || businessHours.trim().isEmpty()) {
+            return segments;
+        }
+        
+        String[] parts = businessHours.trim().split(",");
+        for (String part : parts) {
+            String[] times = part.split("-");
+            if (times.length == 2) {
+                segments.add(new TimeSegment(times[0].trim(), times[1].trim()));
+            }
+        }
+        return segments;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TimeSegment {
+        private String start;
+        private String end;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OpeningTimeResponse {
+        private String rawValue;
+        private List<TimeSegment> segments;
     }
 
     @GetMapping("/timeToStopOrdering")
@@ -95,7 +164,15 @@ public class AppConfigurationController {
     @PostMapping
     @LoginRequired
     @Operation(description = "新增一个")
-    public ResponseEntity<AppConfiguration> addConfiguration(@Valid @RequestBody AppConfigurationApiParams apiParams) {
+    public ResponseEntity<?> addConfiguration(@Valid @RequestBody AppConfigurationApiParams apiParams) {
+        // Validate business hours format if creating business hours configurations
+        if ("weekdays_opening_hours".equals(apiParams.key) || "weekend_opening_hours".equals(apiParams.key)) {
+            String errorMessage = BusinessHoursValidator.validateWithMessage(apiParams.value);
+            if (errorMessage != null) {
+                return ResponseEntity.badRequest().body(new ErrorResponse(errorMessage));
+            }
+        }
+        
         AppConfiguration save = repository.save(AppConfiguration.builder()
                 .key(apiParams.key)
                 .value(apiParams.value)
