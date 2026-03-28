@@ -9,6 +9,7 @@ import com.chimera.weapp.statemachine.context.StateContext;
 import com.chimera.weapp.statemachine.engine.OrderFsmEngine;
 import com.chimera.weapp.statemachine.enums.ErrorCodeEnum;
 import com.chimera.weapp.statemachine.exception.FsmException;
+import com.chimera.weapp.util.BusinessHoursValidator;
 import com.chimera.weapp.util.ThreadLocalUtil;
 import com.chimera.weapp.util.TimeRangeChecker;
 import com.chimera.weapp.vo.CouponIns;
@@ -19,6 +20,9 @@ import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.DayOfWeek;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.List;
 
@@ -41,31 +45,22 @@ public class OrderService {
     private AppConfigurationRepository appConfigurationRepository;
 
     public Order buildOrderByApiParams(OrderApiParams orderApiParams) throws Exception {
-        boolean dineInController = appConfigurationRepository.findByKey("dineInController")
+        String dineInControllerValue = appConfigurationRepository.findByKey("dineInController")
                 .map(AppConfiguration::getValue)
-                .map(val -> {
-                    if ("开".equals(val)) {
-                        return true;
-                    } else if ("关".equals(val)) {
-                        return false;
-                    } else {
-                        throw new RuntimeException("非法的 dineInController 配置值: " + val);
-                    }
-                })
                 .orElseThrow(() -> new Exception("dineInController配置未找到"));
 
-        boolean deliveryController = appConfigurationRepository.findByKey("deliveryController")
+        String deliveryControllerValue = appConfigurationRepository.findByKey("deliveryController")
                 .map(AppConfiguration::getValue)
-                .map(val -> {
-                    if ("开".equals(val)) {
-                        return true;
-                    } else if ("关".equals(val)) {
-                        return false;
-                    } else {
-                        throw new RuntimeException("非法的 deliveryController 配置值: " + val);
-                    }
-                })
                 .orElseThrow(() -> new Exception("deliveryController配置未找到"));
+
+        // 判断是否在营业时间内（用于 auto 模式）
+        boolean isWithinBusinessHours = checkWithinBusinessHours();
+
+        // 处理 dineInController: 开/关/auto
+        boolean dineInController = resolveControllerStatus(dineInControllerValue, isWithinBusinessHours, "dineInController");
+
+        // 处理 deliveryController: 开/关/auto
+        boolean deliveryController = resolveControllerStatus(deliveryControllerValue, isWithinBusinessHours, "deliveryController");
 
         String scene = orderApiParams.getScene();
 
@@ -210,6 +205,58 @@ public class OrderService {
         // 设置订单号，从1开始累计
         orderBuilder.orderNum((int) orderCountToday + 1);
         return orderBuilder.build();
+    }
+
+    /**
+     * 检查当前时间是否在营业时间内
+     * @return true 如果当前时间在配置的营业时间段内
+     */
+    private boolean checkWithinBusinessHours() {
+        try {
+            ZoneId currentZone = ZoneId.systemDefault();
+            ZonedDateTime now = ZonedDateTime.now(currentZone);
+            DayOfWeek dayOfWeek = now.getDayOfWeek();
+            int currentHour = now.getHour();
+            int currentMinute = now.getMinute();
+
+            // 判断今天是周末还是工作日
+            boolean isWeekend = (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY);
+            String openingTimeKey = isWeekend ? "weekend_opening_hours" : "weekdays_opening_hours";
+
+            // 获取营业时间配置
+            String businessHours = appConfigurationRepository.findByKey(openingTimeKey)
+                    .map(AppConfiguration::getValue)
+                    .orElse(null);
+
+            if (businessHours == null || businessHours.trim().isEmpty()) {
+                log.warn("营业时间配置未找到: {}", openingTimeKey);
+                return true; // 如果没有配置，默认允许订单
+            }
+
+            return BusinessHoursValidator.isWithinBusinessHours(businessHours, currentHour, currentMinute);
+        } catch (Exception e) {
+            log.error("检查营业时间出错", e);
+            return true; // 出错时默认允许订单
+        }
+    }
+
+    /**
+     * 解析控制器状态
+     * @param controllerValue 配置值: 开/关/auto
+     * @param isWithinBusinessHours 是否在营业时间内
+     * @param controllerName 控制器名称（用于错误提示）
+     * @return true 如果允许订单
+     */
+    private boolean resolveControllerStatus(String controllerValue, boolean isWithinBusinessHours, String controllerName) {
+        if ("开".equals(controllerValue)) {
+            return true;
+        } else if ("关".equals(controllerValue)) {
+            return false;
+        } else if ("auto".equals(controllerValue)) {
+            return isWithinBusinessHours;
+        } else {
+            throw new RuntimeException("非法的 " + controllerName + " 配置值: " + controllerValue + "，必须是 开/关/auto 之一");
+        }
     }
 
     public Order buildOrderByApiParamsShop(OrderApiParams orderApiParams) {
